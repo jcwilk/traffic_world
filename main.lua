@@ -131,6 +131,7 @@ make_floater = (function()
       floater=obj
     }
     car.renderer = floater_renderer
+    car.sprite_id=8
     return obj
   end
 end)()
