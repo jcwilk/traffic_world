@@ -10,16 +10,17 @@ make_lane = (function()
     local first_to_draw = flr((camera_y-total_offset) / car_space_height)
     local last_to_draw = first_to_draw + ceil(128 / car_space_height) + 1
 
-    if #lane.cars > 0 and last_to_draw >= 1 and first_to_draw <= #lane.cars then
+    if #lane.linkers > 0 and last_to_draw >= 1 and first_to_draw <= #lane.linkers then
       first_to_draw = max(1,first_to_draw)
-      last_to_draw = min(#lane.cars,last_to_draw)
+      last_to_draw = min(#lane.linkers,last_to_draw)
 
       for i=first_to_draw,last_to_draw do
-        lane.cars[i].renderer:draw()
+        lane.linkers[i]:draw()
       end
     end
 
     lane.joiners:each(function(j)
+      printh(lane.index)
       j:draw(lane)
     end)
     lane.floaters:each(function(f)
@@ -52,49 +53,48 @@ make_lane = (function()
 
     local target_index = lane_from:get_car_index_at_y(y)
 
-    if target_index > 0 and target_index <= #lane_from.cars then
-      local car = lane_from.cars[target_index]
+    if target_index > 0 and target_index <= #lane_from.linkers then
+      local linker = lane_from.linkers[target_index]
 
       local min_floater = lane_to.floaters:min('y')
 
-      if min_floater and min_floater <= car.renderer:get_y() + car_space_height then
+      if min_floater and min_floater <= linker:get_y() + car_space_height then
         return
       end
 
-      if car.is_player then
+      if linker.car.is_player then
         return
       end
 
-      lane_to:crash_in(car)
+      lane_to:crash_in(linker.car,linker:get_y())
       lane_from:remove_car_at(target_index)
     end
   end
 
   local function get_tail_y(lane)
-    return lane.offset + #lane.cars * car_space_height
+    return lane.offset + #lane.linkers * car_space_height
   end
 
-  local function lane_renderer_draw(renderer)
-    renderer.car:draw(lane_index_to_car_x(renderer.lane.index),renderer:get_y())
+  local function linker_draw(linker)
+    linker.car:draw(lane_index_to_car_x(linker.lane.index),linker:get_y())
   end
 
-  local function lane_renderer_get_y(renderer)
-    return renderer.lane.offset + (renderer.car_index-1) * car_space_height
+  local function linker_get_y(linker)
+    return linker.lane.offset + (linker.car_index-1) * car_space_height
   end
 
-  local function make_lane_renderer(lane,car,car_index)
+  local function make_linker(lane,car,car_index)
     return {
       lane=lane,
       car=car,
       car_index=car_index,
-      draw=lane_renderer_draw,
-      get_y=lane_renderer_get_y
+      draw=linker_draw,
+      get_y=linker_get_y
     }
   end
 
   local function lane_append_car(lane,car)
-    car.renderer = make_lane_renderer(lane,car,#lane.cars+1)
-    add(lane.cars,car)
+    add(lane.linkers,make_linker(lane,car,#lane.linkers+1))
   end
 
   local function lane_has_joiners(lane)
@@ -106,21 +106,21 @@ make_lane = (function()
   end
 
   local function lane_remove_car_at(lane,car_index)
-    for i = #lane.cars,car_index+1,-1 do
-      car = lane.cars[i]
-      lane.joiners.make(make_joiner(car,car.renderer:get_y()))
-      lane.cars[i]=nil
+    local linker
+    for i = #lane.linkers,car_index+1,-1 do
+      linker = lane.linkers[i]
+      lane.joiners.make(make_joiner(linker.car,linker:get_y()))
+      lane.linkers[i]=nil
     end
 
-    lane.cars[car_index] = nil
+    lane.linkers[car_index] = nil
   end
 
-  local function lane_crash_in(lane,car)
-    local y = car.renderer:get_y()
+  local function lane_crash_in(lane,car,y)
     local target_car_index = lane:get_car_index_at_y(y)
-    if target_car_index <= #lane.cars then
-      local car_i = lane.cars[target_car_index]
-      lane.floaters.make(make_floater(car_i,car_i.renderer:get_y()))
+    if target_car_index <= #lane.linkers then
+      local linker = lane.linkers[target_car_index]
+      lane.floaters.make(make_floater(linker.car,linker:get_y()))
       lane:remove_car_at(target_car_index)
     end
     lane.joiners.make(make_joiner(car,y))
@@ -129,8 +129,8 @@ make_lane = (function()
   end
 
   local function lane_find_player_index(lane)
-    for i=1,#lane.cars do
-      if lane.cars[i].is_player then
+    for i=1,#lane.linkers do
+      if lane.linkers[i].car.is_player then
         return i
       end
     end
@@ -141,7 +141,7 @@ make_lane = (function()
     local obj = {
       draw=draw_lane,
       update=update_lane,
-      cars={},
+      linkers={},
       offset=(rnd(2)-1)*offset_threshold,
       index=index,
       v=rnd(max_velocity - min_velocity)+min_velocity,

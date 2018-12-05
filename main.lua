@@ -80,23 +80,19 @@ make_joiner = (function()
     joiner.car:draw(lane_index_to_car_x(lane.index),joiner.y)
   end
 
-  local function joiner_renderer_get_y(renderer)
-    return renderer.joiner.y
+  local function joiner_get_y(joiner)
+    return joiner.y
   end
 
   return function(car,y)
+    printh(car.is_player)
     local obj = {
       y=y,
       car=car,
+      get_y=joiner_get_y,
       update=update_joiner,
       draw=draw_joiner
     }
-    local joiner_renderer = {
-      get_y=joiner_renderer_get_y,
-      joiner=obj,
-      draw=function() end
-    }
-    car.renderer = joiner_renderer
     return obj
   end
 end)()
@@ -115,39 +111,57 @@ make_floater = (function()
     floater.car:draw(lane_index_to_car_x(lane.index),floater.y)
   end
 
-  local function floater_renderer_get_y(renderer)
-    return renderer.floater.y
+  local function floater_get_y(floater)
+    return floater.y
   end
 
   return function(car,y)
     local obj = {
       y=y,
       car=car,
+      get_y=floater_get_y,
       update=update_floater,
       draw=draw_floater
     }
-    local floater_renderer = {
-      get_y=floater_renderer_get_y,
-      floater=obj
-    }
-    car.renderer = floater_renderer
     car.sprite_id=8
     return obj
   end
 end)()
 
-function move_player(lane_offset)
-  lanes[player_lane+lane_offset]:crash_in(player_car)
-
-  local player_car_index = lanes[player_lane]:find_player_index()
-  if player_car_index then
-    lanes[player_lane]:remove_car_at(player_car_index)
+function get_player_linker()
+  local player_index = lanes[player_lane]:find_player_index()
+  if player_index then
+    return lanes[player_lane].linkers[player_index]
   else
-    lanes[player_lane].joiners:each(function(j)
-      if j.car.is_player then
-        j:kill()
-      end
-    end)
+    return nil
+  end
+end
+
+function get_player_joiner()
+  local joiner
+  lanes[player_lane].joiners:each(function(j)
+    if j.car.is_player then
+      joiner = j
+    end
+  end)
+
+  return joiner
+end
+
+function get_player_manager()
+  return get_player_linker() or get_player_joiner()
+end
+
+function move_player(lane_offset)
+  local player_linker = get_player_linker()
+
+  if player_linker then
+    lanes[player_lane+lane_offset]:crash_in(player_car,player_linker:get_y())
+    lanes[player_lane]:remove_car_at(player_linker.car_index)
+  else
+    local player_joiner = get_player_joiner()
+    lanes[player_lane+lane_offset]:crash_in(player_car,player_joiner:get_y())
+    player_joiner:kill()
   end
   player_lane+=lane_offset
 end
@@ -172,12 +186,12 @@ function _update60()
     lanes[i+1]:try_lane_switch_from_neighbor(lanes[i])
   end
 
-  if is_intro and player_car.renderer:get_y()-50 < camera_y then
+  if is_intro and get_player_manager():get_y()-50 < camera_y then
     is_intro = false
   end
 
   if not is_intro then
-    update_camera_y(player_car.renderer:get_y()-50)
+    update_camera_y(get_player_manager():get_y()-50)
   end
 end
 
