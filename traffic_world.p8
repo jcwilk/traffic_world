@@ -31,6 +31,14 @@ make_pool = (function()
   end
  end
 
+ local function is_any(pool)
+  local res = false
+  pool:each(function(m)
+   res = true
+  end)
+  return res
+ end
+
  local function kill(obj)
   obj.alive = false
  end
@@ -42,6 +50,7 @@ make_pool = (function()
    each = each,
    store = store,
    sort_by = sort_by,
+   is_any = is_any,
    make = function(obj)
     obj = obj or {}
     obj.alive = true
@@ -88,6 +97,13 @@ make_lane = (function()
     lane.cars[i].renderer:draw()
    end
   end
+
+  lane.joiners:each(function(j)
+   j:draw(lane)
+  end)
+  lane.floaters:each(function(f)
+   f:draw(lane)
+  end)
  end
 
  local function update_lane(lane)
@@ -97,13 +113,33 @@ make_lane = (function()
   elseif lane.offset < -offset_threshold and lane.v < min_velocity then
    lane.v+= rnd(max_velocity-min_velocity)
   end
+
+  lane.joiners:each(function(j)
+   j:update(lane)
+  end)
+  lane.floaters:each(function(f)
+   f:update(lane)
+  end)
  end
 
- local function try_lane_switch_from_neighbors(lane)
-  -- local
-  -- for i in all({lane.index-1,lane.index+1}) do
+ local function try_lane_switch_from_neighbor(lane_to, lane_from)
+  if lane_to:has_joiners() then
+   return
+  end
 
-  -- end
+  local y = lane_to:get_tail_y()+car_space_height
+
+  local target_index = lane_from:get_car_index_at_y(y)
+
+  if target_index > 0 and target_index <= #lane_from.cars then
+   local car = lane_from.cars[target_index]
+   if car.is_player then
+    return
+   end
+
+   lane_to:crash_in(car)
+   lane_from:remove_car_at(target_index)
+  end
  end
 
  local function get_tail_y(lane)
@@ -133,8 +169,22 @@ make_lane = (function()
   add(lane.cars,car)
  end
 
+ local function lane_has_joiners(lane)
+  return lane.joiners:is_any()
+ end
+
  local function get_car_index_at_y(lane,y)
   return ceil((y-lane.offset) / car_space_height)
+ end
+
+ local function lane_remove_car_at(lane,car_index)
+  for i = #lane.cars,car_index+1,-1 do
+   car = lane.cars[i]
+   lane.joiners.make(make_joiner(car,car.renderer:get_y()))
+   lane.cars[i]=nil
+  end
+
+  lane.cars[car_index] = nil
  end
 
  local function lane_crash_in(lane,car)
@@ -144,13 +194,22 @@ make_lane = (function()
    local car_i
    for i=#lane.cars,target_car_index,-1 do
     car_i = lane.cars[i]
-    floaters.make(make_floater(car_i,lane.index,car_i.renderer:get_y()))
+    lane.floaters.make(make_floater(car_i,car_i.renderer:get_y()))
     lane.cars[i] = nil
    end
   end
-  joiners.make(make_joiner(car,lane.index,y))
+  lane.joiners.make(make_joiner(car,y))
 
   --TODO - handle the case of switching lanes into the front of the herd
+ end
+
+ local function lane_find_player_index(lane)
+  for i=1,#lane.cars do
+   if lane.cars[i].is_player then
+    return i
+   end
+  end
+  return nil
  end
 
  return function(index, car_count)
@@ -164,7 +223,13 @@ make_lane = (function()
    get_tail_y=get_tail_y,
    append_car=lane_append_car,
    get_car_index_at_y=get_car_index_at_y,
-   crash_in=lane_crash_in
+   crash_in=lane_crash_in,
+   try_lane_switch_from_neighbor=try_lane_switch_from_neighbor,
+   has_joiners=lane_has_joiners,
+   find_player_index=lane_find_player_index,
+   remove_car_at=lane_remove_car_at,
+   joiners=make_pool(),
+   floaters=make_pool()
   }
   if (rnd(1) > .5) then
    obj.v = -obj.v
@@ -181,8 +246,6 @@ end)()
 function _init()
  ground_offset=0
  lanes={}
- joiners=make_pool()
- floaters=make_pool()
  update_camera_y(400)
  is_intro=true
 
@@ -191,10 +254,11 @@ function _init()
  end
 
  player_car = make_car()
+ player_car.is_player = true
  player_car.sprite_id = 7
  player_lane=8
 
- joiners.make(make_joiner(player_car,player_lane,550))
+ lanes[player_lane].joiners.make(make_joiner(player_car,550))
 end
 
 function update_camera_y(new_y)
@@ -232,25 +296,24 @@ end
 make_joiner = (function()
  local speed=.7
 
- local function update_joiner(joiner)
+ local function update_joiner(joiner, lane)
   joiner.y-=speed
-  if lanes[joiner.lane_index]:get_tail_y() >= joiner.y then
-   lanes[joiner.lane_index]:append_car(joiner.car)
+  if lane:get_tail_y() >= joiner.y then
+   lane:append_car(joiner.car)
    joiner:kill()
   end
  end
 
- local function draw_joiner(joiner)
-  joiner.car:draw(lane_index_to_car_x(joiner.lane_index),joiner.y)
+ local function draw_joiner(joiner, lane)
+  joiner.car:draw(lane_index_to_car_x(lane.index),joiner.y)
  end
 
  local function joiner_renderer_get_y(renderer)
   return renderer.joiner.y
  end
 
- return function(car,lane_index,y)
+ return function(car,y)
   local obj = {
-   lane_index=lane_index,
    y=y,
    car=car,
    update=update_joiner,
@@ -269,24 +332,23 @@ end)()
 make_floater = (function()
  local speed=1
 
- local function update_floater(floater)
+ local function update_floater(floater,lane)
   floater.y+=speed
   if floater.y > camera_y+128 then
    floater:kill()
   end
  end
 
- local function draw_floater(floater)
-  floater.car:draw(lane_index_to_car_x(floater.lane_index),floater.y)
+ local function draw_floater(floater,lane)
+  floater.car:draw(lane_index_to_car_x(lane.index),floater.y)
  end
 
  local function floater_renderer_get_y(renderer)
   return renderer.floater.y
  end
 
- return function(car,lane_index,y)
+ return function(car,y)
   local obj = {
-   lane_index=lane_index,
    y=y,
    car=car,
    update=update_floater,
@@ -308,21 +370,41 @@ function _update60()
  end
 
  for lane in all(lanes) do lane:update() end
- joiners:each(function(j)
-  j:update()
- end)
- floaters:each(function(f)
-  f:update()
- end)
 
  if btnp(0) and player_lane > 1 then
-  lanes[player_lane].cars[#lanes[player_lane].cars] = nil
-  lanes[player_lane-1]:crash_in(player_car)
+  lanes[player_lane-1]:crash_in(player_car) --lanes[player_lane]:find_player_index(),lanes[player_lane])
+
+  local player_car_index = lanes[player_lane]:find_player_index()
+  if player_car_index then
+   lanes[player_lane]:remove_car_at(player_car_index)
+  else
+   lanes[player_lane].joiners:each(function(j)
+    if j.car.is_player then
+     j:kill()
+    end
+   end)
+  end
   player_lane-=1
  elseif btnp(1) and player_lane < #lanes then
-  lanes[player_lane].cars[#lanes[player_lane].cars] = nil
   lanes[player_lane+1]:crash_in(player_car)
+
+  local player_car_index = lanes[player_lane]:find_player_index()
+  if player_car_index then
+   lanes[player_lane]:remove_car_at(player_car_index)
+  else
+   lanes[player_lane].joiners:each(function(j)
+    if j.car.is_player then
+     j:kill()
+    end
+   end)
+  end
   player_lane+=1
+ end
+
+ -- attempt ai lane switches
+ for i=1,#lanes-1 do
+  lanes[i]:try_lane_switch_from_neighbor(lanes[i+1])
+  lanes[i+1]:try_lane_switch_from_neighbor(lanes[i])
  end
 
  if is_intro and player_car.renderer:get_y()-50 < camera_y then
@@ -342,12 +424,6 @@ function _draw()
   end
  end
  for lane in all(lanes) do lane:draw() end
- joiners:each(function(j)
-  j:draw()
- end)
- floaters:each(function(f)
-  f:draw()
- end)
  line(3,camera_y,3,camera_y+127,10)
  line(123,camera_y,123,camera_y+127,10)
 end

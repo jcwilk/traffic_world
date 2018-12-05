@@ -25,6 +25,14 @@ make_pool = (function()
     end
   end
 
+  local function is_any(pool)
+    local res = false
+    pool:each(function(m)
+      res = true
+    end)
+    return res
+  end
+
   local function kill(obj)
     obj.alive = false
   end
@@ -36,6 +44,7 @@ make_pool = (function()
       each = each,
       store = store,
       sort_by = sort_by,
+      is_any = is_any,
       make = function(obj)
         obj = obj or {}
         obj.alive = true
