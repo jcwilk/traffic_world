@@ -1,6 +1,5 @@
 -- START LIB
 make_lane = (function()
-  local car_space_height = 9
   local offset_threshold = 30
   local min_velocity = .25
   local max_velocity = .5
@@ -55,6 +54,13 @@ make_lane = (function()
 
     if target_index > 0 and target_index <= #lane_from.cars then
       local car = lane_from.cars[target_index]
+
+      local min_floater = lane_to.floaters:min('y')
+
+      if min_floater and min_floater <= car.renderer:get_y() + car_space_height then
+        return
+      end
+
       if car.is_player then
         return
       end

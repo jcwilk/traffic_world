@@ -39,6 +39,18 @@ make_pool = (function()
   return res
  end
 
+ local function min(pool,key)
+  local min
+  pool:each(function(m)
+   if not min then
+    min = m[key]
+   elseif m[key] < min then
+    min = m[key]
+   end
+  end)
+  return min
+ end
+
  local function kill(obj)
   obj.alive = false
  end
@@ -51,6 +63,7 @@ make_pool = (function()
    store = store,
    sort_by = sort_by,
    is_any = is_any,
+   min = min,
    make = function(obj)
     obj = obj or {}
     obj.alive = true
@@ -78,7 +91,6 @@ end)()
 
 -- start ext ./lanes.lua
 make_lane = (function()
- local car_space_height = 9
  local offset_threshold = 30
  local min_velocity = .25
  local max_velocity = .5
@@ -133,6 +145,14 @@ make_lane = (function()
 
   if target_index > 0 and target_index <= #lane_from.cars then
    local car = lane_from.cars[target_index]
+
+   local min_floater = lane_to.floaters:min('y')
+
+   if min_floater and min_floater <= car.renderer:get_y() + car_space_height then
+    printh("waiting")
+    return
+   end
+
    if car.is_player then
     return
    end
@@ -243,6 +263,8 @@ end)()
 -- end ext
 
 -- start ext ./main.lua
+car_space_height = 9
+
 function _init()
  ground_offset=0
  lanes={}
@@ -300,6 +322,20 @@ make_joiner = (function()
   joiner.y-=speed
   if lane:get_tail_y() >= joiner.y then
    lane:append_car(joiner.car)
+   joiner:kill()
+  end
+  if joiner.car.is_player then
+   return
+  end
+
+  local is_crashed = false
+  lane.floaters:each(function(f)
+   if abs(joiner.y-f.y) < car_space_height then
+    is_crashed = true
+   end
+  end)
+  if is_crashed then
+   lane.floaters.make(make_floater(joiner.car,joiner.y))
    joiner:kill()
   end
  end
@@ -363,6 +399,22 @@ make_floater = (function()
  end
 end)()
 
+function move_player(lane_offset)
+ lanes[player_lane+lane_offset]:crash_in(player_car)
+
+ local player_car_index = lanes[player_lane]:find_player_index()
+ if player_car_index then
+  lanes[player_lane]:remove_car_at(player_car_index)
+ else
+  lanes[player_lane].joiners:each(function(j)
+   if j.car.is_player then
+    j:kill()
+   end
+  end)
+ end
+ player_lane+=lane_offset
+end
+
 function _update60()
  ground_offset+=1
  if ground_offset >= 8 then
@@ -372,33 +424,9 @@ function _update60()
  for lane in all(lanes) do lane:update() end
 
  if btnp(0) and player_lane > 1 then
-  lanes[player_lane-1]:crash_in(player_car) --lanes[player_lane]:find_player_index(),lanes[player_lane])
-
-  local player_car_index = lanes[player_lane]:find_player_index()
-  if player_car_index then
-   lanes[player_lane]:remove_car_at(player_car_index)
-  else
-   lanes[player_lane].joiners:each(function(j)
-    if j.car.is_player then
-     j:kill()
-    end
-   end)
-  end
-  player_lane-=1
+  move_player(-1)
  elseif btnp(1) and player_lane < #lanes then
-  lanes[player_lane+1]:crash_in(player_car)
-
-  local player_car_index = lanes[player_lane]:find_player_index()
-  if player_car_index then
-   lanes[player_lane]:remove_car_at(player_car_index)
-  else
-   lanes[player_lane].joiners:each(function(j)
-    if j.car.is_player then
-     j:kill()
-    end
-   end)
-  end
-  player_lane+=1
+  move_player(1)
  end
 
  -- attempt ai lane switches
