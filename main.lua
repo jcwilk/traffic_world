@@ -66,7 +66,7 @@ make_joiner = (function()
 
     local is_crashed = false
     lane.floaters:each(function(f)
-      if abs(joiner.y-f.y) < car_space_height then
+      if abs(joiner.y-f.y) <= car_space_height-1 then
         is_crashed = true
       end
     end)

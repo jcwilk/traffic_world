@@ -149,7 +149,6 @@ make_lane = (function()
    local min_floater = lane_to.floaters:min('y')
 
    if min_floater and min_floater <= car.renderer:get_y() + car_space_height then
-    printh("waiting")
     return
    end
 
@@ -211,12 +210,9 @@ make_lane = (function()
   local y = car.renderer:get_y()
   local target_car_index = lane:get_car_index_at_y(y)
   if target_car_index <= #lane.cars then
-   local car_i
-   for i=#lane.cars,target_car_index,-1 do
-    car_i = lane.cars[i]
-    lane.floaters.make(make_floater(car_i,car_i.renderer:get_y()))
-    lane.cars[i] = nil
-   end
+   local car_i = lane.cars[target_car_index]
+   lane.floaters.make(make_floater(car_i,car_i.renderer:get_y()))
+   lane:remove_car_at(target_car_index)
   end
   lane.joiners.make(make_joiner(car,y))
 
@@ -330,7 +326,7 @@ make_joiner = (function()
 
   local is_crashed = false
   lane.floaters:each(function(f)
-   if abs(joiner.y-f.y) < car_space_height then
+   if abs(joiner.y-f.y) <= car_space_height-1 then
     is_crashed = true
    end
   end)
