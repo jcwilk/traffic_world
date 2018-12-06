@@ -314,7 +314,7 @@ end
 
 function update_camera_y(new_y)
  camera_y = new_y
- camera(0,new_y)
+ --camera(0,new_y)
 end
 
 make_car = (function()
@@ -325,7 +325,7 @@ make_car = (function()
     pal(k,v)
    end
   end
-  spr(car.sprite_id,x,y)
+  spr(car.sprite_id,x,y-camera_y)
  end
 
  local function update_car(car)
@@ -502,12 +502,12 @@ function _draw()
  cls()
  for roadx=0,13 do
   for roady=-1,16 do
-   spr(5,roadx*8+4,camera_y-camera_y%8+roady*8+ground_offset)
+   spr(5,roadx*8+4,-camera_y%8+roady*8+ground_offset)
   end
  end
  for lane in all(lanes) do lane:draw() end
- line(3,camera_y,3,camera_y+127,10)
- line(123,camera_y,123,camera_y+127,10)
+ line(3,0,3,127,10)
+ line(123,0,123,127,10)
 end
 -- end ext
 __gfx__
