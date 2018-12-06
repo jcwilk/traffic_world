@@ -1,5 +1,6 @@
 -- START LIB
 car_space_height = 9
+crash_height = 8
 
 function _init()
   ground_offset=0
@@ -26,7 +27,8 @@ end
 
 make_car = (function()
   local function draw_car(car,x,y)
-    pal(8,car.color)
+    pal(8,car.primary_color)
+    pal(9,car.secondary_color)
     if car.color_map then
       for k,v in pairs(car.color_map) do
         pal(k,v)
@@ -39,12 +41,15 @@ make_car = (function()
 
   end
 
-  local allowed_colors = {3,4,8,9,10,11,13,14,15}
+  local primary_colors = {3,4,8,9,10,11,13,14,15}
+  local secondary_colors = {5,5,2,4,9,3,5,13,9}
 
   return function()
+    local color_index = ceil(rnd(#primary_colors))
     local obj = {
       draw=draw_car,
-      color=allowed_colors[ceil(rnd(#allowed_colors))],
+      primary_color=primary_colors[color_index],
+      secondary_color=secondary_colors[color_index],
       update=update_car,
       color_map=false,
       sprite_id=6
@@ -73,7 +78,7 @@ make_joiner = (function()
 
     local is_crashed = false
     lane.floaters:each(function(f)
-      if abs(joiner.y-f.y) <= car_space_height-1 then
+      if abs(joiner.y-f.y) <= crash_height then
         is_crashed = true
       end
     end)
@@ -92,7 +97,6 @@ make_joiner = (function()
   end
 
   return function(car,y)
-    printh(car.is_player)
     local obj = {
       y=y,
       car=car,
@@ -111,6 +115,21 @@ make_floater = (function()
     floater.y+=speed
     if floater.y > camera_y+128 then
       floater:kill()
+      return
+    end
+
+    if lane:get_tail_y() > floater.y and floater.y >= lane.offset then
+
+      local target_car_index = lane:get_car_index_at_y(floater.y+crash_height)
+      if target_car_index <= #lane.linkers then
+        local linker = lane.linkers[target_car_index]
+        if not linker.car.is_player then
+          printh("test")
+          printh(floater.y)
+          lane.floaters.make(make_floater(linker.car,linker:get_y()))
+          lane:remove_car_at(target_car_index)
+        end
+      end
     end
   end
 

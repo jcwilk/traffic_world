@@ -7,7 +7,7 @@ police = (function()
         local swp = c.color_map[2]
         c.color_map[2] = c.color_map[3]
         c.color_map[3] = swp
-        c.delay = 20
+        c.delay = 15
       end
       c.delay-=1
     end)

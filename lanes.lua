@@ -20,7 +20,6 @@ make_lane = (function()
     end
 
     lane.joiners:each(function(j)
-      printh(lane.index)
       j:draw(lane)
     end)
     lane.floaters:each(function(f)
