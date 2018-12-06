@@ -319,6 +319,7 @@ make_joiner = (function()
   if lane:get_tail_y() >= joiner.y then
    lane:append_car(joiner.car)
    joiner:kill()
+   return
   end
   if joiner.car.is_player then
    return
