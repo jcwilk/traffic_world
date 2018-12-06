@@ -27,6 +27,11 @@ end
 make_car = (function()
   local function draw_car(car,x,y)
     pal(8,car.color)
+    if car.color_map then
+      for k,v in pairs(car.color_map) do
+        pal(k,v)
+      end
+    end
     spr(car.sprite_id,x,y)
   end
 
@@ -41,6 +46,7 @@ make_car = (function()
       draw=draw_car,
       color=allowed_colors[ceil(rnd(#allowed_colors))],
       update=update_car,
+      color_map=false,
       sprite_id=6
     }
     return obj
@@ -176,10 +182,13 @@ function _update60()
   for lane in all(lanes) do lane:update() end
 
   if btnp(0) and player_lane > 1 then
+    police.make()
     move_player(-1)
   elseif btnp(1) and player_lane < #lanes then
     move_player(1)
   end
+
+  police.update()
 
   -- attempt ai lane switches
   for i=1,#lanes-1 do
