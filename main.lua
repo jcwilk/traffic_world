@@ -17,6 +17,8 @@ function _init()
     add(lanes,make_lane(i,40))
   end
 
+  player_animation = {7,10,7,11}
+
   player_car = make_car()
   player_car.is_player = true
   player_car.sprite_id = 7
@@ -116,7 +118,7 @@ make_joiner = (function()
 end)()
 
 make_floater = (function()
-  local speed=1
+  local speed=.8
 
   local function update_floater(floater,lane)
     floater.y+=speed
@@ -202,12 +204,16 @@ function move_player(lane_offset)
   player_lane+=lane_offset
 end
 
-max_move_delay=60
+max_move_delay=40
 function can_move()
   if move_delay and move_delay > 0 then
     move_delay-=1
+    player_car.sprite_id = player_animation[flr(move_delay^.5*2)%4+1]
+    local scaled = max(move_delay*3-80,0)
+    camera(sin(scaled^2/100)*scaled/30,cos(scaled^2/80)*scaled/30)
     return false
   end
+  player_car.sprite_id=7
   return true
 end
 

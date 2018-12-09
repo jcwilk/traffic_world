@@ -62,7 +62,7 @@ police = (function()
   end
 
   local function make()
-    if police.cars:count() < 40 then
+    if police.cars:count() < 35 then
       local car = make_car()
       car.primary_color=7
       car.secondary_color=5

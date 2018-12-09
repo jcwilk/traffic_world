@@ -1,8 +1,8 @@
 -- START LIB
 make_lane = (function()
   local offset_threshold = 30
-  local min_velocity = .25
-  local max_velocity = .5
+  local min_velocity = .2
+  local max_velocity = .4
 
   local function draw_lane(lane)
     lane.floaters:each(function(f)
