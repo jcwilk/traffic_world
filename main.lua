@@ -195,6 +195,15 @@ function move_player(lane_offset)
   player_lane+=lane_offset
 end
 
+max_move_delay=60
+function can_move()
+  if move_delay and move_delay > 0 then
+    move_delay-=1
+    return false
+  end
+  return true
+end
+
 function _update60()
   police.update()
 
@@ -209,10 +218,12 @@ function _update60()
 
   for lane in all(lanes) do lane:update() end
 
-  if btnp(0) and player_lane > 1 then
-    move_player(-1)
-  elseif btnp(1) and player_lane < #lanes then
-    move_player(1)
+  if can_move() then
+    if btnp(0) and player_lane > 1 then
+      move_player(-1)
+    elseif btnp(1) and player_lane < #lanes then
+      move_player(1)
+    end
   end
 
   -- attempt ai lane switches

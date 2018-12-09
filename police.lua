@@ -61,7 +61,7 @@ police = (function()
   end
 
   local function make()
-    if police.cars:count() < 30 then
+    if police.cars:count() < 60 then
       local car = make_car()
       car.color_map = {}
       car.color_map[2] = 8
