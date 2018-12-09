@@ -207,7 +207,7 @@ end
 function _update60()
   police.update()
 
-  if lost then
+  if lost or won then
     return
   end
 
@@ -226,6 +226,9 @@ function _update60()
     end
   end
 
+  if won then
+    return
+  end
   -- attempt ai lane switches
   for i=1,#lanes-1 do
     lanes[i]:try_lane_switch_from_neighbor(lanes[i+1])
@@ -256,6 +259,12 @@ function _draw()
     rectfill(48,27,78,39,1)
     rect(49,28,77,38,7)
     print("busted",52,31,7)
+  end
+  if won then
+    pal()
+    rectfill(46,27,80,39,3)
+    rect(47,28,79,38,7)
+    print("escaped",50,31,7)
   end
 end
 -- END LIB

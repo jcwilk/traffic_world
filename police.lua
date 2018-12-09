@@ -44,7 +44,9 @@ police = (function()
   end
 
   local function update()
-    check_police_next_to_player()
+    if not won then
+      check_police_next_to_player()
+    end
 
     police.cars:each(function(c)
       if not lost or c.arresting == true then
@@ -52,7 +54,6 @@ police = (function()
           local swp = c.color_map[2]
           c.color_map[2] = c.color_map[3]
           c.color_map[3] = swp
-          c.primary_color=6
           c.delay = 15
         end
         c.delay-=1
@@ -61,8 +62,10 @@ police = (function()
   end
 
   local function make()
-    if police.cars:count() < 60 then
+    if police.cars:count() < 40 then
       local car = make_car()
+      car.primary_color=7
+      car.secondary_color=5
       car.color_map = {}
       car.color_map[2] = 8
       car.color_map[3] = 12

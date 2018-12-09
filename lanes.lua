@@ -119,11 +119,17 @@ make_lane = (function()
   local function lane_crash_in(lane,car,y)
     local target_car_index = lane:get_car_index_at_y(y)
     if target_car_index <= #lane.linkers then
+      local linker = lane.linkers[target_car_index]
       if car.is_player then
         --blah()
         move_delay=max_move_delay
+        if not linker then
+          won=true
+          lane.joiners.make(make_joiner(car,y)) --todo - this is awful
+          return
+        end
       end
-      local linker = lane.linkers[target_car_index]
+
       lane.floaters.make(make_floater(linker.car,linker:get_y()))
       lane:remove_car_at(target_car_index)
     end
