@@ -114,6 +114,9 @@ make_floater = (function()
   local function update_floater(floater,lane)
     floater.y+=speed
     if floater.y > camera_y+128 then
+      if floater.car.alive then
+        floater.car:kill()
+      end
       floater:kill()
       return
     end
@@ -193,6 +196,12 @@ function move_player(lane_offset)
 end
 
 function _update60()
+  police.update()
+
+  if lost then
+    return
+  end
+
   ground_offset+=1
   if ground_offset >= 8 then
     ground_offset = 0
@@ -201,13 +210,10 @@ function _update60()
   for lane in all(lanes) do lane:update() end
 
   if btnp(0) and player_lane > 1 then
-    police.make()
     move_player(-1)
   elseif btnp(1) and player_lane < #lanes then
     move_player(1)
   end
-
-  police.update()
 
   -- attempt ai lane switches
   for i=1,#lanes-1 do
@@ -220,6 +226,7 @@ function _update60()
   end
 
   if not is_intro then
+    police.make()
     update_camera_y(get_player_manager():get_y()-50)
   end
 end
@@ -234,5 +241,10 @@ function _draw()
   for lane in all(lanes) do lane:draw() end
   line(3,0,3,127,10)
   line(123,0,123,127,10)
+  if lost then
+    rectfill(48,27,78,39,1)
+    rect(49,28,77,38,7)
+    print("busted",52,31,7)
+  end
 end
 -- END LIB

@@ -5,6 +5,10 @@ make_lane = (function()
   local max_velocity = .5
 
   local function draw_lane(lane)
+    lane.floaters:each(function(f)
+      f:draw(lane)
+    end)
+
     local car
     local total_offset = lane.offset
     local first_to_draw = flr((camera_y-total_offset) / car_space_height)
@@ -21,9 +25,6 @@ make_lane = (function()
 
     lane.joiners:each(function(j)
       j:draw(lane)
-    end)
-    lane.floaters:each(function(f)
-      f:draw(lane)
     end)
   end
 

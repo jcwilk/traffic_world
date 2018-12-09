@@ -45,6 +45,28 @@ make_pool = (function()
     return min
   end
 
+  local function max(pool,key)
+    local min
+    pool:each(function(m)
+      if not min then
+        min = m[key]
+      elseif m[key] > min then
+        min = m[key]
+      end
+    end)
+    return min
+  end
+
+  local function count(pool)
+    local res=0
+    for i=1,#pool.store do
+      if pool.store[i].alive then
+        res+=1
+      end
+    end
+    return res
+  end
+
   local function kill(obj)
     obj.alive = false
   end
@@ -58,6 +80,8 @@ make_pool = (function()
       sort_by = sort_by,
       is_any = is_any,
       min = min,
+      max = max,
+      count = count,
       make = function(obj)
         obj = obj or {}
         obj.alive = true

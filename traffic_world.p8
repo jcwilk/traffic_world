@@ -51,6 +51,28 @@ make_pool = (function()
   return min
  end
 
+ local function max(pool,key)
+  local min
+  pool:each(function(m)
+   if not min then
+    min = m[key]
+   elseif m[key] > min then
+    min = m[key]
+   end
+  end)
+  return min
+ end
+
+ local function count(pool)
+  local res=0
+  for i=1,#pool.store do
+   if pool.store[i].alive then
+    res+=1
+   end
+  end
+  return res
+ end
+
  local function kill(obj)
   obj.alive = false
  end
@@ -64,6 +86,8 @@ make_pool = (function()
    sort_by = sort_by,
    is_any = is_any,
    min = min,
+   max = max,
+   count = count,
    make = function(obj)
     obj = obj or {}
     obj.alive = true
@@ -96,6 +120,10 @@ make_lane = (function()
  local max_velocity = .5
 
  local function draw_lane(lane)
+  lane.floaters:each(function(f)
+   f:draw(lane)
+  end)
+
   local car
   local total_offset = lane.offset
   local first_to_draw = flr((camera_y-total_offset) / car_space_height)
@@ -112,9 +140,6 @@ make_lane = (function()
 
   lane.joiners:each(function(j)
    j:draw(lane)
-  end)
-  lane.floaters:each(function(f)
-   f:draw(lane)
   end)
  end
 
@@ -260,26 +285,81 @@ end)()
 -- start ext ./police.lua
 police = {}
 police = (function()
- local function update()
-  police.cars:each(function(c)
-   if not c.delay or c.delay <= 0 then
-    local swp = c.color_map[2]
-    c.color_map[2] = c.color_map[3]
-    c.color_map[3] = swp
-    c.delay = 15
+ local function check_police_in_lane_at_y(lane,y)
+  target_index = lane:get_car_index_at_y(y)
+  if target_index > 0 and target_index < #lane.linkers and lane.linkers[target_index].car.is_police then
+   lost=true
+   lane.linkers[target_index].car.arresting=true
+  end
+ end
+
+ local function check_police_in_lane_for_car_at_y(lane,y)
+  check_police_in_lane_at_y(lane,y+2)
+  check_police_in_lane_at_y(lane,y+6)
+  lane.joiners:each(function(j)
+   if j.car.is_police and abs(j.y - y) <= 4 then
+    lost=true
+    j.car.arresting=true
    end
-   c.delay-=1
+  end)
+ end
+
+ local function check_police_next_to_player()
+  local p = get_player_linker()
+
+  if p then
+   if p.car_index > 1 and p.lane.linkers[p.car_index-1].car.is_police then
+    lost=true
+    p.lane.linkers[p.car_index-1].car.arresting=true
+   elseif p.car_index < #p.lane.linkers and p.lane.linkers[p.car_index+1].car.is_police then
+    lost=true
+    p.lane.linkers[p.car_index+1].car.arresting=true
+   end
+  end
+
+  p = p or get_player_joiner()
+  local y = p:get_y()
+  if player_lane > 1 then
+   check_police_in_lane_for_car_at_y(lanes[player_lane-1],y)
+  end
+  if player_lane < 15 then
+   check_police_in_lane_for_car_at_y(lanes[player_lane+1],y)
+  end
+ end
+
+ local function update()
+  check_police_next_to_player()
+
+  police.cars:each(function(c)
+   if not lost or c.arresting == true then
+    if not c.delay or c.delay <= 0 then
+     local swp = c.color_map[2]
+     c.color_map[2] = c.color_map[3]
+     c.color_map[3] = swp
+     c.primary_color=6
+     c.delay = 15
+    end
+    c.delay-=1
+   end
   end)
  end
 
  local function make()
-  local car = make_car()
-  car.color_map = {}
-  car.color_map[2] = 8
-  car.color_map[3] = 12
-  car.sprite_id=9
-  police.cars.make(car)
-  lanes[5].joiners.make(make_joiner(car,camera_y+150))
+  if police.cars:count() < 30 then
+   local car = make_car()
+   car.color_map = {}
+   car.color_map[2] = 8
+   car.color_map[3] = 12
+   car.sprite_id=9
+   car.is_police=true
+   police.cars.make(car)
+   local lane=lanes[ceil(rnd(15))]
+   local y=max(camera_y+150,lane:get_tail_y())
+   if lane.joiners:is_any() then
+    y = max(y,lane.joiners:max('y')+car_space_height)
+   end
+   lane.joiners.make(make_joiner(car,y))
+  end
  end
 
  return {
@@ -406,6 +486,9 @@ make_floater = (function()
  local function update_floater(floater,lane)
   floater.y+=speed
   if floater.y > camera_y+128 then
+   if floater.car.alive then
+    floater.car:kill()
+   end
    floater:kill()
    return
   end
@@ -485,6 +568,12 @@ function move_player(lane_offset)
 end
 
 function _update60()
+ police.update()
+
+ if lost then
+  return
+ end
+
  ground_offset+=1
  if ground_offset >= 8 then
   ground_offset = 0
@@ -493,13 +582,10 @@ function _update60()
  for lane in all(lanes) do lane:update() end
 
  if btnp(0) and player_lane > 1 then
-  police.make()
   move_player(-1)
  elseif btnp(1) and player_lane < #lanes then
   move_player(1)
  end
-
- police.update()
 
  -- attempt ai lane switches
  for i=1,#lanes-1 do
@@ -512,6 +598,7 @@ function _update60()
  end
 
  if not is_intro then
+  police.make()
   update_camera_y(get_player_manager():get_y()-50)
  end
 end
@@ -526,17 +613,22 @@ function _draw()
  for lane in all(lanes) do lane:draw() end
  line(3,0,3,127,10)
  line(123,0,123,127,10)
+ if lost then
+  rectfill(48,27,78,39,1)
+  rect(49,28,77,38,7)
+  print("busted",52,31,7)
+ end
 end
 -- end ext
 __gfx__
-0000000000888800000008888880000000000000000000000088800000676000c000000000757000000000000000000000000000000000000000000000000000
-00000000c888888c0c828888888828c00000000000000000098889000676760000880c0005757500000000000000000000000000000000000000000000000000
+0000000000888800000008888880000000000000000000000088800000676000c000000000656000000000000000000000000000000000000000000000000000
+00000000c888888c0c828888888828c00000000000000000098889000676760000880c0005656500000000000000000000000000000000000000000000000000
 007007000c8888c00028888888888200000000000000000789ccc98076ccc67008c0800055ccc550000000000000000000000000000000000000000000000000
-000770000c8888c002c8888888888c2000888800000000000c888c000c767c000088080022273330000000000000000000000000000000000000000000000000
+000770000c8888c002c8888888888c2000888800000000000c888c000c767c000088080022253330000000000000000000000000000000000000000000000000
 0007700008cccc8002c8888888888c2008888880000000000c888c000c676c000c8880c022273330000000000000000000000000000000000000000000000000
-0070070008cccc8002c8888888888c20088888800000000709888900067676000888880005757500000000000000000000000000000000000000000000000000
+0070070008cccc8002c8888888888c20088888800000000709888900067676000888880005656500000000000000000000000000000000000000000000000000
 000000000887788002c8888888888c20088888800000000709ccc90006ccc60008c0080c05ccc500000000000000000000000000000000000000000000000000
-00000000050000500288cccccccc882088cccc880000000709888900067676000888880005757500000000000000000000000000000000000000000000000000
+00000000050000500288cccccccc882088cccc880000000709888900067676000888880005656500000000000000000000000000000000000000000000000000
 0000000000888800088cccccccccc8800c8888c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000888800088cccccccccc8800c8888c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000088cc8800888cccccccc88800c8888c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
