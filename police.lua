@@ -70,6 +70,9 @@ police = (function()
       car.color_map[2] = 8
       car.color_map[3] = 12
       car.sprite_id=9
+      car.straight_sprite_id=9
+      car.turn_left_sprite_id=14
+      car.turn_right_sprite_id=15
       car.is_police=true
       police.cars.make(car)
       local lane=lanes[ceil(rnd(15))]

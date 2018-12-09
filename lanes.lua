@@ -66,6 +66,12 @@ make_lane = (function()
         return
       end
 
+      if lane_to.index > lane_from.index then
+        linker.car:turn_right()
+      else
+        linker.car:turn_left()
+      end
+
       lane_to:crash_in(linker.car,linker:get_y())
       lane_from:remove_car_at(target_index)
     end

@@ -4,6 +4,7 @@ crash_height = 8
 
 function _init()
   police.cars=make_pool()
+  all_cars = make_pool()
 
   ground_offset=0
   lanes={}
@@ -12,7 +13,6 @@ function _init()
   won=false
   lost=false
   move_delay=0
-  reset_turn_sprite_delay=0
 
   for i=1,15 do
     add(lanes,make_lane(i,40))
@@ -36,6 +36,8 @@ function update_camera_y(new_y)
 end
 
 make_car = (function()
+  local max_reset_turn_delay = 5
+
   local function draw_car(car,x,y)
     pal(8,car.primary_color)
     pal(9,car.secondary_color)
@@ -48,7 +50,22 @@ make_car = (function()
   end
 
   local function update_car(car)
+    if car.reset_turn_sprite_delay > 0 then
+      car.reset_turn_sprite_delay-= 1
+      if car.reset_turn_sprite_delay <= 0 then
+        car.sprite_id = car.straight_sprite_id
+      end
+    end
+  end
 
+  local function car_turn_left(car)
+    car.sprite_id = car.turn_left_sprite_id
+    car.reset_turn_sprite_delay = max_reset_turn_delay
+  end
+
+  local function car_turn_right(car)
+    car.sprite_id = car.turn_right_sprite_id
+    car.reset_turn_sprite_delay = max_reset_turn_delay
   end
 
   local primary_colors = {3,4,13}
@@ -60,10 +77,17 @@ make_car = (function()
       draw=draw_car,
       primary_color=primary_colors[color_index],
       secondary_color=secondary_colors[color_index],
+      turn_left_sprite_id=12,
+      turn_right_sprite_id=13,
+      straight_sprite_id=6,
+      reset_turn_sprite_delay=0,
       update=update_car,
+      turn_left=car_turn_left,
+      turn_right=car_turn_right,
       color_map=false,
       sprite_id=6
     }
+    all_cars.make(obj)
     return obj
   end
 end)()
@@ -124,9 +148,7 @@ make_floater = (function()
   local function update_floater(floater,lane)
     floater.y+=speed
     if floater.y > camera_y+128 then
-      if floater.car.alive then
-        floater.car:kill()
-      end
+      floater.car:kill()
       floater:kill()
       return
     end
@@ -212,9 +234,7 @@ function can_move()
     camera(sin(scaled^2/100)*scaled/30,cos(scaled^2/80)*scaled/30)
     return false
   end
-  if reset_turn_sprite_delay > 0 then
-    reset_turn_sprite_delay-=1
-  else
+  if player_car.reset_turn_sprite_delay <= 0 then
     player_car.sprite_id=7
   end
   return true
@@ -239,12 +259,10 @@ function _update60()
 
   if can_move() then
     if btnp(0) and player_lane > 1 then
-      player_car.sprite_id=10
-      reset_turn_sprite_delay=5
+      player_car:turn_left()
       move_player(-1)
     elseif btnp(1) and player_lane < #lanes then
-      player_car.sprite_id=11
-      reset_turn_sprite_delay=5
+      player_car:turn_right()
       move_player(1)
     end
   end
@@ -266,6 +284,10 @@ function _update60()
     police.make()
     update_camera_y(get_player_manager():get_y()-50)
   end
+
+  all_cars:each(function(c)
+    c:update()
+  end)
 end
 
 function _draw()
