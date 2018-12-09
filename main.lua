@@ -3,10 +3,15 @@ car_space_height = 9
 crash_height = 8
 
 function _init()
+  police.cars=make_pool()
+
   ground_offset=0
   lanes={}
   update_camera_y(400)
   is_intro=true
+  won=false
+  lost=false
+  move_delay=0
 
   for i=1,15 do
     add(lanes,make_lane(i,40))
@@ -208,6 +213,9 @@ function _update60()
   police.update()
 
   if lost or won then
+    if btn(4) or btn(5) then
+      _init()
+    end
     return
   end
 
