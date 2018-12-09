@@ -20,6 +20,8 @@ function _init()
   player_car = make_car()
   player_car.is_player = true
   player_car.sprite_id = 7
+  player_car.primary_color = 8
+  player_car.secondary_color = 2
   player_lane=8
 
   lanes[player_lane].joiners.make(make_joiner(player_car,550))
@@ -46,8 +48,8 @@ make_car = (function()
 
   end
 
-  local primary_colors = {3,4,8,9,10,11,13,14,15}
-  local secondary_colors = {5,5,2,4,9,3,5,13,9}
+  local primary_colors = {3,4,13}
+  local secondary_colors = {5,5,5}
 
   return function()
     local color_index = ceil(rnd(#primary_colors))
