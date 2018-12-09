@@ -397,6 +397,7 @@ function _init()
  won=false
  lost=false
  move_delay=0
+ reset_turn_sprite_delay=0
 
  for i=1,15 do
   add(lanes,make_lane(i,40))
@@ -521,8 +522,6 @@ make_floater = (function()
    if target_car_index <= #lane.linkers then
     local linker = lane.linkers[target_car_index]
     if not linker.car.is_player then
-     printh("test")
-     printh(floater.y)
      lane.floaters.make(make_floater(linker.car,linker:get_y()))
      lane:remove_car_at(target_car_index)
     end
@@ -598,7 +597,11 @@ function can_move()
   camera(sin(scaled^2/100)*scaled/30,cos(scaled^2/80)*scaled/30)
   return false
  end
- player_car.sprite_id=7
+ if reset_turn_sprite_delay > 0 then
+  reset_turn_sprite_delay-=1
+ else
+  player_car.sprite_id=7
+ end
  return true
 end
 
@@ -621,8 +624,12 @@ function _update60()
 
  if can_move() then
   if btnp(0) and player_lane > 1 then
+   player_car.sprite_id=10
+   reset_turn_sprite_delay=5
    move_player(-1)
   elseif btnp(1) and player_lane < #lanes then
+   player_car.sprite_id=11
+   reset_turn_sprite_delay=5
    move_player(1)
   end
  end
